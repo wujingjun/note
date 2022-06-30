@@ -41,3 +41,43 @@ make
 make install
 ```
 
+
+
+
+
+## 方案二：yum安装
+
+Nginx官方网站即可查看
+
+```
+https://nginx.org/en/linux_packages.html#RHEL-CentOS
+```
+
+
+
+
+
+
+
+# Nginx卸载
+
+
+
++ 步骤一：需要将nginx的进程关闭
+
+```
+./nginx -s stop
+```
+
++ 步骤二：将安装的nginx进行删除
+
+```
+rm -rf /usr/local/nginx
+```
+
++ 步骤三：将安装包之前的编译的环境清除掉
+
+```
+make clean
+```
+
