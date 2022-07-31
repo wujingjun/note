@@ -675,6 +675,12 @@ nginx -V
 
 ## Nginx静态资源部署
 
+
+
+###  Nginx静态资源的配置指令
+
+
+
 #### listen指令
 
 listen:用来配置监听端口
@@ -684,7 +690,7 @@ listen:用来配置监听端口
 | 默认值 | listen *:80 \| *:8000                                        |
 | 位置   | server                                                       |
 
-
+listen的设置比较灵活，我们通过几个例子来把常用的设置方式熟悉下:
 
 ```
 listen 127.0.0.1:8000; // listen localhost:8000 监听指定的IP和端口
@@ -868,3 +874,758 @@ server{
 ```
 
 结论：
+
+```
+exact_success
+wildcard_before_success
+wildcard_after_success
+regex_success
+default_server not found server!!
+```
+
+```
+No1:准确匹配server_name
+
+No2:通配符在开始时匹配server_name成功
+
+No3:通配符在结束时匹配server_name成功
+
+No4:正则表达式匹配server_name成功
+
+No5:被默认的default_server处理，如果没有指定默认找第一个server
+```
+
+
+
+#### location指令
+
+```
+server{
+	listen 80;
+	server_name localhost;
+	location / {
+	
+	}
+	location /abc{
+		
+	}
+	...
+}
+```
+
+location:用来设置请求的URI
+
+| 语法   | location [  =  \|   ~  \|  ~*   \|   ^~   \|@ ] uri{...} |
+| ------ | -------------------------------------------------------- |
+| 默认值 | —                                                        |
+| 位置   | server,location                                          |
+
+uri变量是待匹配的请求字符串，可以不包含正则表达式，也可以包含正则表达式，那么nginx服务器再搜索匹配location的时候，是先使用不包含正则表达式进行匹配，找到一个匹配度最高的一个，然后在通过包含正则表达式的进行匹配，如果能匹配到直接访问，匹配不到，就使用刚才匹配度最高的那个location来处理请求。
+
+属性介绍:
+
+
+
+不带符号，要求必须以指定模式开始
+
+```
+server {
+	listen 80;
+	server_name 127.0.0.1;
+	location /abc{
+		default_type text/plain;
+		return 200 "access success";
+	}
+}
+以下访问都是正确的
+http://192.168.200.133/abc
+http://192.168.200.133/abc?p1=TOM
+http://192.168.200.133/abc/
+http://192.168.200.133/abcdef
+```
+
+=:用于不包含正则表达式的uri前，必须与指定的模式精确匹配
+
+```
+server {
+	listen 80;
+	server_name 127.0.0.1;
+	location =/abc{
+		default_type text/plain;
+		return 200 "access success";
+	}
+}
+可以匹配到
+http://192.168.200.133/abc
+http://192.168.200.133/abc?p1=TOM
+匹配不到
+http://192.168.200.133/abc/
+http://192.168.200.133/abcdef
+```
+
+~:用于表示当前uri中包含了正则表达式，并且区分大小写
+
+~*：用于表示当前uri中包含了正则表达式，并且不区分大小写
+
+
+
+换句话说，如果uri包含了正则表达式，需要用上述两个符合来标识
+
+```
+server {
+	listen 80;
+	server_name 127.0.0.1;
+	location ~^/abc\w${
+		default_type text/plain;
+		return 200 "access success";
+	}
+}
+server {
+	listen 80;
+	server_name 127.0.0.1;
+	location ~*^/abc\w${
+		default_type text/plain;
+		return 200 "access success";
+	}
+}
+```
+
+^~: 用于不包含正则表达式的uri前，功能和不加符号的一致，唯一不同的是，如果模式匹配，那么就停止搜索其他模式了。
+
+```
+server {
+	listen 80;
+	server_name 127.0.0.1;
+	location ^~/abc{
+		default_type text/plain;
+		return 200 "access success";
+	}
+}
+```
+
+#### 设置请求资源的目录root / alias
+
+root：设置请求的根目录
+
+| 语法   | root path;             |
+| ------ | ---------------------- |
+| 默认值 | root html;             |
+| 位置   | http、server、location |
+
+path为Nginx服务器接收到请求以后查找资源的根目录路径。
+
+alias：用来更改location的URI
+
+| 语法   | alias path; |
+| ------ | ----------- |
+| 默认值 | —           |
+| 位置   | location    |
+
+path为修改后的根路径。
+
+以上两个指令都可以来指定访问资源的路径，那么这两者之间的区别是什么？
+
+举例说明：
+
+（1）在`/usr/local/nginx/html`目录下创建一个 images目录,并在目录下放入一张图片`mv.png`图片
+
+```
+location /images {
+	root /usr/local/nginx/html;
+}
+```
+
+访问图片的路径为:
+
+```
+http://192.168.200.133/images/mv.png
+```
+
+（2）如果把root改为alias
+
+```
+location /images {
+	alias /usr/local/nginx/html;
+}
+```
+
+再次访问上述地址，页面会出现404的错误，查看错误日志会发现是因为地址不对，所以验证了：
+
+```
+root的处理结果是: root路径+location路径
+/usr/local/nginx/html/images/mv.png
+alias的处理结果是:使用alias路径替换location路径
+/usr/local/nginx/html/images
+```
+
+需要在alias后面路径改为
+
+```
+location /images {
+	alias /usr/local/nginx/html/images;
+}
+```
+
+（3）如果location路径是以/结尾,则alias也必须是以/结尾，root没有要求
+
+将上述配置修改为
+
+```
+location /images/ {
+	alias /usr/local/nginx/html/images/;
+}
+```
+
+小结：
+
+```
+root的处理结果是: root路径+location路径
+alias的处理结果是:使用alias路径替换location路径
+alias是一个目录别名的定义，root则是最上层目录的含义。
+如果location路径是以/结尾,则alias也必须是以/结尾，root没有要求
+```
+
+#### index指令
+
+index:设置网站的默认首页
+
+| 语法   | index file ...;        |
+| ------ | ---------------------- |
+| 默认值 | index index.html;      |
+| 位置   | http、server、location |
+
+index后面可以跟多个设置，如果访问的时候没有指定具体访问的资源，则会依次进行查找，找到第一个为止。
+
+举例说明：
+
+```
+location / {
+	root /usr/local/nginx/html;
+	index index.html index.htm;
+}
+访问该location的时候，可以通过 http://ip:port/，地址后面如果不添加任何内容，则默认依次访问index.html和index.htm，找到第一个来进行返回
+```
+
+#### error_page指令
+
+error_page:设置网站的错误页面
+
+| 语法   | error_page code ... [=[response]] uri; |
+| ------ | -------------------------------------- |
+| 默认值 | —                                      |
+| 位置   | http、server、location......           |
+
+当出现对应的响应code后，如何来处理。
+
+举例说明：
+
+（1）可以指定具体跳转的地址
+
+```
+server {
+	error_page 404 http://www.itcast.cn;
+}
+```
+
+（2）可以指定重定向地址
+
+```
+server{
+	error_page 404 /50x.html;
+	error_page 500 502 503 504 /50x.html;
+	location =/50x.html{
+		root html;
+	}
+}
+```
+
+（3）使用location的@符合完成错误信息展示
+
+```
+server{
+	error_page 404 @jump_to_error;
+	location @jump_to_error {
+		default_type text/plain;
+		return 404 'Not Found Page...';
+	}
+}
+```
+
+可选项`=[response]`的作用是用来将相应代码更改为另外一个
+
+```
+server{
+	error_page 404 =200 /50x.html;
+	location =/50x.html{
+		root html;
+	}
+}
+这样的话，当返回404找不到对应的资源的时候，在浏览器上可以看到，最终返回的状态码是200，这块需要注意下，编写error_page后面的内容，404后面需要加空格，200前面不能加空格
+```
+
+### 静态资源优化配置语法
+
+Nginx对静态资源如何进行优化配置。这里从三个属性配置进行优化:
+
+```
+sendfile on;
+tcp_nopush on;
+tcp_nodeplay on;
+```
+
+（1）sendﬁle，用来开启高效的文件传输模式。
+
+| 语法   | sendﬁle on \|oﬀ;          |
+| ------ | ------------------------- |
+| 默认值 | sendﬁle oﬀ;               |
+| 位置   | http、server、location... |
+
+请求静态资源的过程：客户端通过网络接口向服务端发送请求，操作系统见这些客户端的请求传递更黑服务器端应用程序，服务器端应用程序会处理这些请求，请求处理完成以后，操作系统还需要将处理得到的结果通过网络适配器传递回去。
+
+如:
+
+```
+server {
+	listen 80;
+	server_name localhost；
+	location / {
+		root html;
+		index index.html;
+	}
+}
+在html目录下有一个welcome.html页面，访问地址
+http://192.168.200.133/welcome.html
+```
+
+![1587655397104](D:\note\nginx.assets\1587655397104.png)
+
+
+
+![1587665814562](D:\note\nginx.assets\1587665814562.png)
+
+（2）tcp_nopush：该指令必须在sendfile打开的状态下才会生效，主要是用来提升网络包的传输'效率'
+
+| 语法   | tcp_nopush on\|off;    |
+| ------ | ---------------------- |
+| 默认值 | tcp_nopush oﬀ;         |
+| 位置   | http、server、location |
+
+（3）tcp_nodelay：该指令必须在keep-alive连接开启的情况下才生效，来提高网络包传输的'实时性'
+
+| 语法   | tcp_nodelay on\|off;   |
+| ------ | ---------------------- |
+| 默认值 | tcp_nodelay on;        |
+| 位置   | http、server、location |
+
+![1587832596733](D:\note\nginx.assets\1587832596733.png)
+
+经过刚才的分析，"tcp_nopush"和”tcp_nodelay“看起来是"互斥的"，那么为什么要将这两个值都打开，这个大家需要知道的是在linux2.5.9以后的版本中两者是可以兼容的，三个指令都开启的好处是，sendfile可以开启高效的文件传输模式，tcp_nopush开启可以确保在发送到客户端之前数据包已经充分“填满”， 这大大减少了网络开销，并加快了文件发送的速度。 然后，当它到达最后一个可能因为没有“填满”而暂停的数据包时，Nginx会忽略tcp_nopush参数， 然后，tcp_nodelay强制套接字发送数据。由此可知，TCP_NOPUSH可以与TCP_NODELAY一起设置，它比单独配置TCP_NODELAY具有更强的性能。所以我们可以使用如下配置来优化Nginx静态资源的处理
+
+```
+sendfile on;
+tcp_nopush on;
+tcp_nodelay on;
+```
+
+### Nginx静态资源压缩实战 
+
+经过上述内容的优化，我们再次思考一个问题，假如在满足上述优化的前提下，我们传送一个1M的数据和一个10M的数据那个效率高?，答案显而易见，传输内容小，速度就会快。那么问题又来了，同样的内容，如果把大小降下来，我们脑袋里面要蹦出一个词就是"压缩"，接下来，我们来学习Nginx的静态资源压缩模块。
+
+在Nginx的配置文件中可以通过配置gzip来对静态资源进行压缩，相关的指令可以配置在http块、server块和location块中，Nginx可以通过
+
+```
+ngx_http_gzip_module模块
+ngx_http_gzip_static_module模块
+ngx_http_gunzip_module模块
+```
+
+对这些指令进行解析和处理。
+
+接下来我们从以下内容进行学习
+
+```
+（1）Gzip各模块支持的配置指令
+（2）Gzip压缩功能的配置
+（3）Gzip和sendfile的冲突解决
+（4）浏览器不支持Gzip的解决方案
+```
+
+#### Gzip模块配置指令
+
+接下来所学习的指令都来自ngx_http_gzip_module模块，该模块会在nginx安装的时候内置到nginx的安装环境中，也就是说我们可以直接使用这些指令。
+
+1. gzip指令：该指令用于开启或者关闭gzip功能
+
+| 语法   | gzip on\|off;             |
+| ------ | ------------------------- |
+| 默认值 | gzip off;                 |
+| 位置   | http、server、location... |
+
+注意只有该指令为打开状态，下面的指令才有效果
+
+```
+http{
+   gzip on;
+}
+```
+
+2. gzip_types指令：该指令可以根据响应页的MIME类型选择性地开启Gzip压缩功能
+
+| 语法   | gzip_types mime-type ...; |
+| ------ | ------------------------- |
+| 默认值 | gzip_types text/html;     |
+| 位置   | http、server、location    |
+
+所选择的值可以从mime.types文件中进行查找，也可以使用"*"代表所有。
+
+```
+http{
+	gzip_types application/javascript;
+}
+```
+
+3. gzip_comp_level指令：该指令用于设置Gzip压缩程度，级别从1-9,1表示要是程度最低，要是效率最高，9刚好相反，压缩程度最高，但是效率最低最费时间。
+
+| 语法   | gzip_comp_level level; |
+| ------ | ---------------------- |
+| 默认值 | gzip_comp_level 1;     |
+| 位置   | http、server、location |
+
+```
+http{
+	gzip_comp_level 6;
+}
+```
+
+4. gzip_vary指令：该指令用于设置使用Gzip进行压缩发送是否携带“Vary:Accept-Encoding”头域的响应头部。主要是告诉接收方，所发送的数据经过了Gzip压缩处理
+
+| 语法   | gzip_vary on\|off;     |
+| ------ | ---------------------- |
+| 默认值 | gzip_vary off;         |
+| 位置   | http、server、location |
+
+![1587361606028](D:\note\nginx.assets\1587361606028-1659284200400.png)
+
+5. gzip_buffers指令：该指令用于处理请求压缩的缓冲区数量和大小。
+
+| 语法   | gzip_buffers number size;  |
+| ------ | -------------------------- |
+| 默认值 | gzip_buffers 32 4k\|16 8k; |
+| 位置   | http、server、location     |
+
+其中number:指定Nginx服务器向系统申请缓存空间个数，size指的是每个缓存空间的大小。主要实现的是申请number个每个大小为size的内存空间。这个值的设定一般会和服务器的操作系统有关，所以建议此项不设置，使用默认值即可。
+
+```
+gzip_buffers 4 16K;	  #缓存空间大小
+```
+
+
+
+6. gzip_disable指令：针对不同种类客户端发起的请求，可以选择性地开启和关闭Gzip功能。
+
+| 语法   | gzip_disable regex ...; |
+| ------ | ----------------------- |
+| 默认值 | —                       |
+| 位置   | http、server、location  |
+
+regex:根据客户端的浏览器标志(user-agent)来设置，支持使用正则表达式。指定的浏览器标志不使用Gzip.该指令一般是用来排除一些明显不支持Gzip的浏览器。
+
+```
+gzip_disable "MSIE [1-6]\.";
+```
+
+
+
+7. gzip_http_version指令：针对不同的HTTP协议版本，可以选择性地开启和关闭Gzip功能。
+
+| 语法   | gzip_http_version 1.0\|1.1; |
+| ------ | --------------------------- |
+| 默认值 | gzip_http_version 1.1;      |
+| 位置   | http、server、location      |
+
+该指令是指定使用Gzip的HTTP最低版本，该指令一般采用默认值即可。
+
+8. gzip_min_length指令：该指令针对传输数据的大小，可以选择性地开启和关闭Gzip功能
+
+| 语法   | gzip_min_length length; |
+| ------ | ----------------------- |
+| 默认值 | gzip_min_length 20;     |
+| 位置   | http、server、location  |
+
+```
+nignx计量大小的单位：bytes[字节] / kb[千字节] / M[兆]
+例如: 1024 / 10k|K / 10m|M
+```
+
+Gzip压缩功能对大数据的压缩效果明显，但是如果要压缩的数据比较小的化，可能出现越压缩数据量越大的情况，因此我们需要根据响应内容的大小来决定是否使用Gzip功能，响应页面的大小可以通过头信息中的`Content-Length`来获取。但是如何使用了Chunk编码动态压缩，该指令将被忽略。建议设置为1K或以上。
+
+9. gzip_proxied指令：该指令设置是否对服务端返回的结果进行Gzip压缩。
+
+| 语法   | gzip_proxied  off\|expired\|no-cache\|<br/>no-store\|private\|no_last_modified\|no_etag\|auth\|any; |
+| ------ | ------------------------------------------------------------ |
+| 默认值 | gzip_proxied off;                                            |
+| 位置   | http、server、location                                       |
+
+off - 关闭Nginx服务器对后台服务器返回结果的Gzip压缩
+expired - 启用压缩，如果header头中包含 "Expires" 头信息
+no-cache - 启用压缩，如果header头中包含 "Cache-Control:no-cache" 头信息
+no-store - 启用压缩，如果header头中包含 "Cache-Control:no-store" 头信息
+private - 启用压缩，如果header头中包含 "Cache-Control:private" 头信息
+no_last_modified - 启用压缩,如果header头中不包含 "Last-Modified" 头信息
+no_etag - 启用压缩 ,如果header头中不包含 "ETag" 头信息
+auth - 启用压缩 , 如果header头中包含 "Authorization" 头信息
+any - 无条件启用压缩
+
+#### Gzip压缩功能的实例配置
+
+```
+gzip on;  			  #开启gzip功能
+gzip_types *;		  #压缩源文件类型,根据具体的访问资源类型设定
+gzip_comp_level 6;	  #gzip压缩级别
+gzip_min_length 1024; #进行压缩响应页面的最小长度,content-length
+gzip_buffers 4 16K;	  #缓存空间大小
+gzip_http_version 1.1; #指定压缩响应所需要的最低HTTP请求版本
+gzip_vary  on;		  #往头信息中添加压缩标识
+gzip_disable "MSIE [1-6]\."; #对IE6以下的版本都不进行压缩
+gzip_proxied  off； #nginx作为反向代理压缩服务端返回数据的条件
+```
+
+这些配置在很多地方可能都会用到，所以我们可以将这些内容抽取到一个配置文件中，然后通过include指令把配置文件再次加载到nginx.conf配置文件中，方法使用。
+
+nginx_gzip.conf
+
+```
+gzip on;
+gzip_types *;
+gzip_comp_level 6;
+gzip_min_length 1024;
+gzip_buffers 4 16K;
+gzip_http_version 1.1;
+gzip_vary  on;
+gzip_disable "MSIE [1-6]\.";
+gzip_proxied  off;
+```
+
+nginx.conf
+
+```
+include nginx_gzip.conf
+```
+
+#### Gzip和sendfile共存问题
+
+前面在讲解sendfile的时候，提到过，开启sendfile以后，在读取磁盘上的静态资源文件的时候，可以减少拷贝的次数，可以不经过用户进程将静态文件通过网络设备发送出去，但是Gzip要相对资源压缩，是需要经过用户进程进行操作的。所以如何解决两个设置的共存问题。
+
+gzip_static: 检查与访问资源同名的.gz文件时，response中以gzip相关的header返回.gz文件的内容。
+
+| 语法   | **gzip_static** on \| off \| always; |
+| ------ | ------------------------------------ |
+| 默认值 | gzip_static off;                     |
+| 位置   | http、server、location               |
+
+添加上述命令后，会报一个错误，`unknown directive "gzip_static"`主要的原因是Nginx默认是没有添加ngx_http_gzip_static_module模块。如何来添加?
+
+##### 添加模块到Nginx的实现步骤
+
+(1)查询当前Nginx的配置参数
+
+```
+nginx -V
+```
+
+(2)将nginx安装目录下sbin目录中的nginx二进制文件进行更名
+
+```
+cd /usr/local/nginx/sbin
+mv nginx nginxold
+```
+
+(3) 进入Nginx的安装目录
+
+```
+cd /root/nginx/core/nginx-1.16.1
+```
+
+(4)执行make clean清空之前编译的内容
+
+```
+make clean
+```
+
+(5)使用configure来配置参数
+
+```
+./configure --with-http_gzip_static_module
+```
+
+(6)使用make命令进行编译
+
+```
+make
+```
+
+(7) 将objs目录下的nginx二进制执行文件移动到nginx安装目录下的sbin目录中
+
+```
+mv objs/nginx /usr/local/nginx/sbin
+```
+
+(8)执行更新命令
+
+```
+make upgrade
+```
+
+##### 
+
+##### gzip_static测试使用
+
+(1)直接访问`http://192.168.200.133/jquery.js`
+
+![1587932106429](D:\note\nginx.assets\1587932106429.png)
+
+
+
+(2)使用gzip命令进行压缩
+
+```
+cd /usr/local/nginx/html
+gzip jquery.js
+```
+
+(3)再次访问`http://192.168.200.133/jquery.js`
+
+![1587932300006](D:\note\nginx.assets\1587932300006.png)
+
+### 静态资源的缓存处理
+
+#### 什么是缓存
+
+```
+缓存（cache），原始意义是指访问速度比一般随机存取存储器（RAM）快的一种高速存储器，通常它不像系统主存那样使用DRAM技术，而使用昂贵但较快速的SRAM技术。缓存的设置是所有现代计算机系统发挥高性能的重要因素之一。
+```
+
+#### 什么是web缓存？
+
+```
+Web缓存是指一个Web资源（如html页面，图片，js，数据等）存在于Web服务器和客户端（浏览器）之间的副本。缓存会根据进来的请求保存输出内容的副本；当下一个请求来到的时候，如果是相同的URL，缓存会根据缓存机制决定是直接使用副本响应访问请求，还是向源服务器再次发送请求。比较常见的就是浏览器会缓存访问过网站的网页，当再次访问这个URL地址的时候，如果网页没有更新，就不会再次下载网页，而是直接使用本地缓存的网页。只有当网站明确标识资源已经更新，浏览器才会再次下载网页
+```
+
+#### web缓存的种类
+
+```
+客户端缓存
+	浏览器缓存
+服务端缓存
+	Nginx / Redis / Memcached等
+```
+
+#### 浏览器缓存
+
+```
+是为了节约网络的资源加速浏览，浏览器在用户磁盘上对最近请求过的文档进行存储，当访问者再次请求这个页面时，浏览器就可以从本地磁盘显示文档，这样就可以加速页面的阅览.
+```
+
+#### 为什么要用浏览器缓存
+
+```
+成本最低的一种缓存实现
+减少网络带宽消耗
+降低服务器压力
+减少网络延迟，加快页面打开速度
+```
+
+#### 浏览器缓存的执行流程
+
+HTTP协议中和页面缓存相关的字段，我们先来认识下：
+
+| header        | 说明                                        |
+| ------------- | ------------------------------------------- |
+| Expires       | 缓存过期的日期和时间                        |
+| Cache-Control | 设置和缓存相关的配置信息                    |
+| Last-Modified | 请求资源最后修改时间                        |
+| ETag          | 请求变量的实体标签的当前值，比如文件的MD5值 |
+
+#### 
+
+![](D:\note\nginx.assets\1581762832290.png)
+
+（1）用户首次通过浏览器发送请求到服务端获取数据，客户端是没有对应的缓存，所以需要发送request请求来获取数据；
+
+（2）服务端接收到请求后，获取服务端的数据及服务端缓存的允许后，返回200的成功状态码并且在响应头上附上对应资源以及缓存信息；
+
+（3）当用户再次访问相同资源的时候，客户端会在浏览器的缓存目录中查找是否存在响应的缓存文件
+
+（4）如果没有找到对应的缓存文件，则走(2)步
+
+（5）如果有缓存文件，接下来对缓存文件是否过期进行判断，过期的判断标准是(Expires),
+
+（6）如果没有过期，则直接从本地缓存中返回数据进行展示
+
+（7）如果Expires过期，接下来需要判断缓存文件是否发生过变化
+
+（8）判断的标准有两个，一个是ETag(Entity Tag),一个是Last-Modified
+
+（9）判断结果是未发生变化，则服务端返回304，直接从缓存文件中获取数据
+
+（10）如果判断是发生了变化，重新从服务端获取数据，并根据缓存协商(服务端所设置的是否需要进行缓存数据的设置)来进行数据缓存。
+
+#### 浏览器缓存相关指令
+
+Nginx需要进行缓存相关设置，就需要用到如下的指令
+
+##### expires指令
+
+expires:该指令用来控制页面缓存的作用。可以通过该指令控制HTTP应答中的“Expires"和”Cache-Control"
+
+| 语法   | expires   [modified] time<br/>expires epoch\|max\|off; |
+| ------ | ------------------------------------------------------ |
+| 默认值 | expires off;                                           |
+| 位置   | http、server、location                                 |
+
+time:可以整数也可以是负数，指定过期时间，如果是负数，Cache-Control则为no-cache,如果为整数或0，则Cache-Control的值为max-age=time;
+
+epoch: 指定Expires的值为'1 January,1970,00:00:01 GMT'(1970-01-01 00:00:00)，Cache-Control的值no-cache
+
+max:指定Expires的值为'31 December2037 23:59:59GMT' (2037-12-31 23:59:59) ，Cache-Control的值为10年
+
+off:默认不缓存。
+
+##### add_header指令
+
+add_header指令是用来添加指定的响应头和响应值。
+
+| 语法   | add_header name value [always]; |
+| ------ | ------------------------------- |
+| 默认值 | —                               |
+| 位置   | http、server、location...       |
+
+Cache-Control作为响应头信息，可以设置如下值：
+
+缓存响应指令：
+
+```
+Cache-control: must-revalidate
+Cache-control: no-cache
+Cache-control: no-store
+Cache-control: no-transform
+Cache-control: public
+Cache-control: private
+Cache-control: proxy-revalidate
+Cache-Control: max-age=<seconds>
+Cache-control: s-maxage=<seconds>
+```
+
+| 指令             | 说明                                           |
+| ---------------- | ---------------------------------------------- |
+| must-revalidate  | 可缓存但必须再向源服务器进行确认               |
+| no-cache         | 缓存前必须确认其有效性                         |
+| no-store         | 不缓存请求或响应的任何内容                     |
+| no-transform     | 代理不可更改媒体类型                           |
+| public           | 可向任意方提供响应的缓存                       |
+| private          | 仅向特定用户返回响应                           |
+| proxy-revalidate | 要求中间缓存服务器对缓存的响应有效性再进行确认 |
+| max-age=<秒>     | 响应最大Age值                                  |
+| s-maxage=<秒>    | 公共缓存服务器响应的最大Age值                  |
+
+max-age=[秒]：
