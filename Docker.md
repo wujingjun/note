@@ -104,3 +104,160 @@ Docker运行的基本流程为:
    ![image-20221117202627054](D:\note\Docker.assets\image-20221117202627054.png)
 
 ![image-20221117202604603](D:\note\Docker.assets\image-20221117202604603.png)
+
+
+
+
+
+
+
+# 帮助启动类命令
+
++ 启动docker：systemctl start docker
++ 停止docker：systemctl stop docker
++ 重启docker：systemctl restsart docker
++ 查看docker状态：systemctl status docker
++ 开机启动：systemctl enable docker
++ 查看docker概要信息：docker info
++ 查看docker总体帮助文档：docker --help
++ 查看docker命令帮助文档：docker 具体命令 --help
+
+
+
+
+
+
+
+# 镜像命令
+
++ docker images：列出本地主机上的镜像	
+  + 各个选项说明：
+    + REPOSITORY：表示镜像的仓库源
+    + TAG：镜像的标签版本号
+    + IMAGE ID：镜像ID
+    + CREATED：镜像创建时间
+    + SIZE：镜像大小
+  + 同一个仓库可以有多个TAG版本，代表这个仓库源的不同版本，我们使用REPOSITORY：TAG来定义不同的镜像。如果你不指定一个镜像的版本标签，例如你只使用ubuntu，docker将默认使用ubuntu:latest镜像
+  + OPTIONS说明：
+    + -a：列出本地所有的镜像（含历史映像层）
+    + -q：只显示镜像ID
++ docker search（某个镜像的名称）
+  + -limit：只列出N个镜像，默认25个
++ docker pull（某个镜像的名称）：获取远程仓库的某个镜像
++ docker system df 查看镜像/容器/数据卷所占的空间
++ docker rmi（某个镜像名字ID）：删除某个镜像
+  + 强制删除 -f
+  + 删除单个 docker rmi -f 镜像ID
+  + 删除多个 docker rmi -f 镜像名1：TAG 镜像名2：TAG
++ 面试题：谈谈docker虚悬镜像是什么？
+  + 仓库名、标签都是<none>的镜像，俗称虚悬镜像dangling image
+
+
+
+
+
+# 容器命令
+
+前提：docker pull ubuntu
+
++ 新建+启动容器
++ docker run [options] image [command][ARG...]
+  
+  + -name="容器新名字"  为容器指定一个名称
+    + -d：后台运行容器并返回容器ID，也即启动守护式容器（后台运行）
+    + -i：以交互模式运行容器，通常与-t同时使用；
+    + -t：为容器重新分配一个伪输入终端，通常与-i同时使用；
+    + 也即启动交互式容器（前台有伪终端，等待交互）
+    + -P：随机端口映射，大写P
+    + -p：指定端口映射，小写p
+  
++ 创建接口命令窗口
+  + docker run -it ubuntu /bin/bash
+    + -i:交互式操作
+    + -t:终端
+    + centos：centos镜像
+    + /bin/bash：放在镜像名后的是命令，这里我们希望有个交互式Shell，因此用的是/bin/bash
+    + 要退出终端，直接输入exit
++ 列出当前所有正在运行的容器
+  + docker ps [options]
++ 退出容器
+  + exit：run进去容器，exit退出，容器停止
+  + ctrl+p+q：run进去容器，ctrl+p+q推出，容器不停止
+
++ 启动已停止运行的容器
+  + docker start 容器ID或者容器名
++ 重启容器
+  + docker restart 容器ID或者容器名
++ 停止容器
+  + docker stop 容器ID或者容器名
++ 强制停止容器
+  + docker kill 容器ID或者容器名
++ 删除已停止的容器
+  + docker rm 容器ID
++ **启动守护式容器（后台服务器）**
+  + 在大部分场景下，我们希望docker的服务是在后台运行的，我们可以通过-d指定容器的后台运行模式
+  + docker run -d 容器名
+  + redis前后台启动演示case
+    + 前台交互式启动：docker run -it redis:6.0.8
+    + 后台守护式启动：docker run -d redis:6.0.8
+
++ **查看容器日志**
+  + docker logs 容器ID
++ **查看容器内运行的进程**
+  + docker top 容器ID
++ **查看容器内部细节**
+  + docker inspect 容器ID
++ **进入正在运行的容器并以命令进行交互**
+  + docker exec -it 容器ID bash
+  + 重新进入docker attach 容器ID
+  + 案例演示，用centos或者ubuntu都可以
+  + 上述两个区别
+    + attach直接进入容器启动命令的终端，不会启动新的进程用exit退出，会导致容器的停止。
+    + exec是在容器中打开新的终端，并且可以启动新的进程用exit退出，不会导致容器的停止。
+  + 推荐大家使用docker exec命令，因为退出同期终端，不会导致容器的停止。
++ **从容器内拷贝文件到主机上**
+  + 容器->主机
+  + docker cp 容器ID:容器内路径 目的主机路径
++ **导入导出容器**
+  + export 导出容器的内容流作为一个tar归档文件【对应import命令】
+  + import从tar包中的内容创建一个新的文件系统再导入为镜像【对应export】
+  + 案例
+    + docker export 容器ID > 文件名.tar
+    + cat 文件名.tar | docker import - 镜像用户/镜像名：镜像版本号
+
+
+
+
+
+# Docker镜像的分层概念
+
+
+
+
+
+## 镜像
+
+是一种轻量级、可执行的独立软件包，它包含运行某个软件所需的所有内容，我们把应用程序和配置依赖打包好形成一个可交付的运行环境（包括代码、运行时需要的库、环境变量和配置文件等），这个打包好的运行环境就是image镜像文件。
+
+
+
+只有通过这个镜像文件才能生成Docker容器实例（类似Java中new出来一个对象）
+
+
+
+以我们的pull为例，在下载的过程中我们可以看到docker的镜像好像是在一层一层的在下载
+
+
+
+**UnionFS（联合文件系统）**：Union文件系统（UnionFS）是一种分层、轻量级并且高性能的文件系统，它支持对文件系统的修改作为一次提交来一层层的叠加，同时可以将不同目录挂载到同一个虚拟文件系统下(unite serveral directories into a single virtual filesystem)。Union文件系统是Dokcer镜像的基础。镜像可以额通过分层来进行继承，基于基础镜像（没有父镜像），可以制作各种具体的应用镜像。
+
+特性： 一次同时加载多个文件系统，但从外面看起来，只能看到一个文件系统，联合加载会把各层文件系统叠加起来，这样最终的文件系统会包含所有底层的文件和目录
+
+
+
+## Docker镜像加载原理
+
+docker的镜像实际上是由一层一层的文件系统组成，这种层级的文件系统UnionFS。
+
+
+
