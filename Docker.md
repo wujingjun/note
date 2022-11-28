@@ -297,10 +297,104 @@ Docker镜像层都是只读得，容器层是可写的。
 
 
 
-
-
 **Docker镜像commit操作实例**
 
 + docker commit提交容器副本使之成为一个新的镜像
+
 + docker commit -m=“提交的描述信息” -a="作者" 容器ID要创建的目标镜像名：【标签名】
-+ 
+
+  ```
+  docker commit -m="vim配置和网络配置" -a="mie" 1ec59033bb56 mie/mie-ubuntu:0.0.1
+  ```
+
+  
+
+Docker中的镜像分层，支持通过扩展现有镜像，创建新的镜像。类似Java继承于一个Base基础类，自己再按需扩展。
+
+新镜像是从Base镜像一层一层叠加生成的。每安装一个软件，就在现有镜像的基础上增加一层。
+
+
+
+
+
+
+
+# 本地镜像发布到阿里云
+
+![image-20221121120936293](D:\note\Docker.assets\image-20221121120936293.png)
+
+
+
+
+
+# Docker私有库简介
+
+Docker Registry 是官方提供的工具，可以用于构建私有镜像仓库。
+
+
+
+**将本地镜像推送到私有库**
+
+1. 下载镜像Docker Registry
+   
+   1. docker pull registry
+   
+2. 运行私有库Registry，相当于本地有个私有Docker Hub
+   
+   1. docker run -d -p 5000:5000 -v /zzyyuse/myregistry --privileged=true registry
+   
+3. 案例演示创建一个新镜像，ubuntu安装ifconfig命令
+
+   1. 从Hub上下载ubuntu镜像到本地并成功运行
+   2. 原始的Ubuntu镜像是不带着ifconfig命令的
+   3. 外网联通的情况下，安装Ifconfig命令并测试通过：apt-get install net-tools
+   4. 安装完成后，commit我们自己的新镜像
+      1. 公式
+         1. docker commit -m = "提交的描述信息" -a="作者" 容器ID 要创建的目标镜像名:[标签名]
+      2. 命令
+         1. 在容器外执行，记得
+   5. 启动我们的新镜像并和原来的对比
+
+4. curl验证私服库上有什么镜像
+
+   1. curl -XGET http://localhost:5000/v2/_catalog
+
+5. 将新镜像修改符合私服规范的Tag
+
+   1. 按照公式:
+      1. docker tag 镜像:Tag Host:Port/Repository:Tag
+         1. 自己host主机IP地址
+      2. 使用命令docker tag讲zzyyubuntu:1.2这个镜像修改为192.168.111.162：5000/zzyyubuntu:1.2
+         1. docker tag zzyyubuntu:1.2 192.168.111.162：5000/zzyyubuntu:1.2
+
+6. 修改配置文件使之支持Http
+
+   1. vim /etc/docker/daemon.json
+
+      1. 添加以下内容
+
+         ```
+         {
+           "registry-mirrors": ["https://png8qy0v.mirror.aliyuncs.com"],
+           "insecure-registries":["192.168.17.200:5000"]
+         }
+         ```
+
+   2. 上述理由
+
+      1. docker 默认不允许http方式推送镜像，通过配置选项来取消这个限制。===》修改后如果不生效，建议重启docker
+
+7. push推送到私服库
+
+   1. docker push 192.168.17.200:5000/zzyyubuntu:1.2
+
+8. curl验证私服库上有什么镜像
+
+   1. curl -XGET http://localhost:5000/v2/_catalog
+
+9. pull到本地并运行
+
+   1. docker pull 192.168.17.200:5000/zzyyubuntu:1.2
+
+
+
