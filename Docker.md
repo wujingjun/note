@@ -398,3 +398,228 @@ Docker Registry 是官方提供的工具，可以用于构建私有镜像仓库�
 
 
 
+
+
+
+
+# 容器数据卷是什么
+
+
+
+Docke挂载主机目录访问如果出现cannot open directory:Permission denied
+
+解决方法：在挂载目录后多加一个--privileged=true参数即可
+
+如果是centos安全模块会比之前系统版本加强，不安全的会先禁止，所以目录挂载的情况被默认为不安全的行为。
+
+在SELinux里面挂载目录被禁止掉了，如果要开启，我们一般使用--privileged=true命令，扩大容器的权限解决挂载目录没有权限的问题，也即使用该参数，container内的root拥有真正的root权限，否则，container的root权限只是外部的一个普通用户权限。
+
+
+
+**是什么**
+
+一句话：有点类似于我们Redis里面的rdb和aof文件
+
+将docker容器内的数据保存进宿主机的磁盘中
+
+卷就是目录或文件，存在于一个或多个容器中，由docker挂载到容器，但不属于联合文件系统，因此能够绕过Union File System提供一些用于持续存储或共享数据的特性。
+
+卷的设计目的就是数据的持久化。完全独立于容器的生存周期，因此Docker不会在容器删除时删除其挂载的数据卷。
+
+
+
+**运行一个带有容器卷存储功能的容器实例**
+
+docker run -it --privileged=true -v /宿主机绝对路径目录:/容器内目录 镜像名
+
+
+
+**能干嘛**
+
+将运用和运行的环境打包镜像，run后形成容器实例运行，但是我们对数据的要求希望是持久化的
+
+Docker容器产生的数据，如果不备份，那么当容器实例删除后，容器内的数据自然也就没有了。
+
+为了能保存数据在Docker中我们使用卷。
+
+特点：
+
+1. 数据卷可以在容器之间共享或重用数据
+2. 卷中的更改可以直接实时生效
+3. 数据卷中的更改不会包含在镜像的更新中
+4. 数据卷的生命周期一直持续到没有容器使用它为止
+
+
+
+
+
+# 容器卷和主机互通互联
+
+
+
+## 宿主VS容器之间映射添加容器卷
+
+**直接命令添加**
+
++ 命令
+  + docker run -it --privileged=true -v /宿主机绝对路径目录：/容器内目录 镜像名
++ 查看数据卷是否挂载成功
++ 容器和宿主机之间数据共享
+
+
+
+## 读写规则映射添加说明
+
+**读写（默认）**
+
++ docker run -it --privileged=true -v /宿主机绝对路径目录:/容器内目录:rw 镜像名
++ 默认同上案例，默认就是rw
+
+**只读**
+
++ 容器实例内部被限制，只能读取不能写
++ docker run -it --privileged=true -v /宿主机绝对路径：/容器内目录：ro 镜像名
+  + 宿主机可以写内容，同步到容器
+
+
+
+## 卷的继承和共享
+
+**容器1完成和宿主机的映射**
+
+**容器2继承容器1的卷规则**
+
++ docker  run it --privileged=true --volumes-from 父类 --name u2 ubuntu
+
+
+
+
+
+# Docker上安装常用软件说明
+
++ 搜索镜像
++ 拉取镜像
++ 查看镜像
++ 启动镜像
+  + 服务端口映射
++ 停止容器
++ 删除容器
+
+
+
+
+
+## 安装Tomcat
+
++ docker hub上面查找tomcat镜像
+  + docker search tomcat
++ 从docker hub 上拉取tomcat镜像到本地
+  + docker pull tomcat
++ 查看是否有拉取到tomcat
+  + docekr images tomcat
++ 使用tomcat镜像创建容器实例（也叫运行镜像）
+
+  + docker run -it -p 8080:8080 tomcat
+
+    + -p 小写，主机端口：docker 容器端口
+    + -P 大写，随机分配端口
+    + i:交互
+    + t:终端
+    + d:后台
++ 访问猫首页
+  + 问题
+    + 404问题
+  + 解决
+    + 可能没有映射端口或者没有关闭防火墙
+    + 把webapps.dist目录换成webapps
+
+​    
+
++ 免修改版说明
+  + docker pull billygoo/tomcat8-jdk8
+  + docker run -d -p 8080:8080 --name mytomcat8 billygoo/tomcat8-jdk8
+
+​    
+
+
+
+## 安装mysql
+
++ docker hub上面查找mysql镜像
+
++ 从docker hub上（阿里云加速器）拉取mysql镜像到本地标签为5.7
+
++ 使用mysql5.7镜像创建容器（也叫运行镜像）
+
+  + 简单版
+
+    + 使用mysql镜像
+    + 建库建表插入数据
+    + 外部win10也来连接运行在docker上的mysql容器实例服务
+    + 问题
+      + 插入中文数据试试
+        + 为什么报错？
+          + docker上默认字符集编码隐患
+      + 删除容器后，里面的mysql数据如何办?
+        + 容器实例一删除，什么都没有
+
+  + 小坑点
+
+    + docekr安装的mysql容器内执行命令 
+
+    ```
+    SHOW variables like 'character%'
+    ```
+
+    全是拉丁文，会导致无法插入中文字符
+
+  + 实战版
+
+    +  新建mysql容器实例
+
+      + docker run -d -p 3306:3306 --privileged=true -v /zzyyuse/mysql/log:/var/log/mysql -v /zzyyuse/mysql/data:/var/lib/mysql -v /zzyyuse/mysgl/conf:/etc/mysql/conf.d -e MYSQL_ROOT_PASSWORD=123456 --name mysql mysql:5.7
+
+    + 新建my.cnf
+
+      + 并编写以下内容
+
+        + 路径为: /zzyyuse/mysgl/conf
+    
+        + ```
+          [client]
+          default_character_set=utf8
+          [mysqld]
+          collation_server=utf8_general_ci
+          character_set_server=utf8
+          ```
+    
+      + 通过容器卷同步mysql容器实例
+    
+    + 重新启动mysql容器给实例再重新进入并查集字符编码
+    
+    + 再新建库新建表再插入中文测试
+    
+    + 结论
+    
+    + 假如将当前容器实例删除，再重新来一次，之前建的db01实例还有吗？
+
+
+
+
+
+## 安装Redis
+
++ 从docker hub上（阿里云加速器）拉取redis镜像到本地，标签为6.0.8
++ 命令提醒：容器记得加入--privileged=true
++ 在Centos宿主机下新建目录/app/redis
+  + mkdir -p /app/redis
++ 将一个redis.conf文件模板拷贝进/app/redis目录下
++ /app/redis目录下修改reids.conf文件
+  + 默认出厂的原始redis.conf
+  + ![image-20221203160859380](D:\note\Docker.assets\image-20221203160859380.png)
++ 使用redis 6.0.8镜像创建容器（也叫运行镜像）
+  + docker run -p 6379:6379 --name myr4 --privileged=true -v /app/redis/redis.conf:/etc/redis/redis.conf -v /app/redis/data:/data -d redis redis-server /etc/redis/redis.conf
++ 测试redis-cli连接上来
++ 请证明docker启动使用了我们自己指定的配置文件
++ 测试redis-cli连接上来第二次
+
