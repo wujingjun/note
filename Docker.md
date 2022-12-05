@@ -623,3 +623,104 @@ Docker容器产生的数据，如果不备份，那么当容器实例删除后�
 + 请证明docker启动使用了我们自己指定的配置文件
 + 测试redis-cli连接上来第二次
 
+
+
+
+
+# mysql主从复制docker版
+
+
+
+## 主从搭建步骤
+
++ 新建主服务器容器实例3307
+  
+  + docker run -p 3307:3306 --name mysql-master  -v /mydata/mysql-master/log:/var/log/mysql -v /mydata/mysql-master/data:/var/lib/mysql -v /mydata/mysql-master/conf:/etc/mysql -e MYSQL_ROOT_PASSWORD=root -d mysql:5.7
+  
++ 进入/mydata/mysql-master/conf目录下新建my.cnf
+
+  + ```cnf
+    [mysqld]
+    ## 设置server_id,同一局域网中需要唯一
+    server_id=101
+    ## 指定不需要同步的数据库名称
+    binlog-ignore-db=mysql
+    ## 开启二进制日志功能
+    log-bin=mall-mysql-bin
+    ## 设置二进制使用内存大小（事务）
+    binlog_cache_size=1M
+    ## 设置使用的二进制日志格式（mixed,statement,row）
+    binlog_format=mixed
+    ##  二进制日志过期清理时间，默认值为0，表示不自动清理
+    expire_logs_days=7
+    ##  跳过主从复制中遇到的所有错误或指定类型的错误，避免slave端复制中断。
+    ##  如：1062错误是指一些主键错误，1032错误是因为主从数据库数据不一致
+    slave_skip_errors=1062
+    ```
+
++ 修改完配置后重启master实例
+
+  + docker restart 容器名
+
++ 进入mysql-master容器
+
++ master容器实例内创建数据同步用户
+
+  + create user 'slave'@'%' identified by '123456';
+  + grant replication slave,replication client on * . * TO ' slave ' @ ' % '；
+
++ 新建从服务器容器实例3308
+  
+  + docker run -p 3308:3306 --name mysql-slave  -v /mydata/mysql-slave/log:/var/log/mysql -v /mydata/mysql-slave/data:/var/lib/mysql -v /mydata/mysql-slave/conf:/etc/mysql -e MYSQL_ROOT_PASSWORD=root -d mysql:5.7
+  
++ 进入/mydata/mysql-slave/conf目录下新建my.cnf
+
+  + ```
+    [mysqld]
+    ## 设置server_id,同一局域网中需要唯一
+    server_id=102
+    ## 指定不需要同步的数据库名称
+    binlog-ignore-db=mysql
+    ## 开启二进制日志功能,以备Slave作为其它数据库实例的Master时使用
+    log-bin=mall-mysql-slave1-bin
+    ## 设置二进制使用内存大小（事务）
+    binlog_cache_size=1M
+    ## 设置使用的二进制日志格式（mixed,statement,row）
+    binlog_format=mixed
+    ##  二进制日志过期清理时间，默认值为0，表示不自动清理
+    expire_logs_days=7
+    ##  跳过主从复制中遇到的所有错误或指定类型的错误，避免slave端复制中断。
+    ##  如：1062错误是指一些主键错误，1032错误是因为主从数据库数据不一致
+    slave_skip_errors=1062
+    ## relay_log配置中继日志
+    relay_log=mall-mysql-relay-bin
+    ## log_slave_updates表示slave将复制事件写进自己的二进制日志
+    log_slave_updates=1
+    ## slave设置为只读（具有super权限的用户除外）
+    read_only=1
+    ```
+
++ 修改完配置后重启slave实例
+
++ 在主数据库中查看主从同步状态
+
+  + show master status;
+
++ 进入mysql-slave容器
+
++ 在从数据库中配置主从复制
+
+  + change master to master_host='宿主机ip',master_user='slave',master_password='123456',master_port=3307,master_log_file='mall-mysql-bin.000001',master_log_pos=617,master_connect_retry=30;
+  + ![image-20221206001333905](D:\note\Docker.assets\image-20221206001333905.png)
+
++ 在从数据库中查看主从同步状态
+
+  + show slave status \G;
+
++ 在从数据库中开启主从同步
+
+  + start slave;
+
++ 查看从数据库状态发现已经同步
+
++ 主从复制测试
