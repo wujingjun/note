@@ -973,7 +973,7 @@ docker run -d --name redis-node-1 --net  host --privileged=true -v /data/redis/s
 
 
 
-## 主从扩容分析
+## 主从扩容
 
 + 新建6387、6388两个节点+新建后启动+查看是否8节点】
 + 进入6387容器实例内部
@@ -996,4 +996,28 @@ docker run -d --name redis-node-1 --net  host --privileged=true -v /data/redis/s
   + redis-cli --cluster add-node 192.168.17.200:6388 192.168.17.200:6387 --cluster-slave --cluster-master-id c4e1b0bcb05bf0528b1b9bc1064ab0dc1d931a1d
   + 注意最后这个是编号，需要执行以下命令获得
     + redis-cli --cluster check 192.168.17.200:6381
++ 检查集群情况第三次
+
+
+
+
+
+
+
+## 主从缩容
+
++ 目的：6387和6388下线
++ 检查集群情况1获得6388的节点ID
++ redis-cli --cluster check 192.168.17.200:6381
++ 将6388删除
++ 从集群中将4号从节点6388删除
+  + redis-cli --cluster del-node ip:从机端口 从机6388节点ID
+  + redis-cli --cluster del-node 192.168.17.200:6388 a23b8357280757df523bc6ea9951aee6529ec25c
++ 将6387的槽号清空，重新分配，本例将清出来的槽号都给6381
+  + redis-cli --cluster reshared 192.168.17.200:6381
+  + ![image-20221210141227536](Docker.assets\image-20221210141227536.png)
++ 检查集群情况第二次
+  + ![image-20221210141608691](Docker.assets\image-20221210141608691.png)
++ 将6387删除
+  +  redis-cli --cluster del-node 192.168.17.200:6387 c4e1b0bcb05bf0528b1b9bc1064ab0dc1d931a1d
 + 检查集群情况第三次
