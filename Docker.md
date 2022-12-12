@@ -1201,3 +1201,122 @@ Dockerfile面向开发，Docker镜像成为交付标准，Docker容器则涉及�
 
 
 
+
+
+
+
+## Dockerfile需求说明
+
++ 下载JDK
+  + 进入oracle网址
+  + https://www.oracle.com/java/technologies/javase/javase8u211-later-archive-downloads.html
+
++ 要求
+  
+  + centos7镜像具备vim+ifconfig+jdk8
+  
++ 编写
+  + 准备编写Dockerfile文件
+    
+    + 大写字母D
+    
+    + 编写内容
+    
+    + ```
+      FROM centos
+      MAINTAINER miejiang<824573518@qq.com>
+      
+      ENV MYPATH /usr/local
+      WORKDIR $MYPATH
+      
+      #安装VIM编辑器
+      RUN yum -y install vim
+      #安装ifconfig命令查看网络IP
+      RUN yun -y install net-tools
+      #安装 java8及lib库
+      RUN yum -y install glibc.i686
+      RUN mkdir /usr/local/java
+      #ADD 是相对路径jar，把jdk-8u171-linux-x64.tar.gz添加到容器中，安装包必须要和Dockerfile文件在同一位置
+      ADD jdk-8u171-linux-x64.tar.gz /usr/local/java/
+      #配置java环境变量
+      ENV JAVA_HOME /usr/local/java/jdk1.8.0_171
+      ENV JRE_HOME $JAVA_HOME/jre
+      ENV CLASSPATH $JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar:$JRE_HOME/lib:$CLASSPATH
+      ENV PATH $JAVA_HOME/bin:$PATH
+      
+      EXPOSE 80
+       
+      CMD echo $MYPATH
+      CMD echo "success--------------ok"
+      CMD /bin/bash
+      ```
+  
++ 构建
+  + docker build -t新镜像名字:TAG .
+  + 注意,上面TAG后面有个空格，有个点 
+  
++ 运行
+
++ 再体会下UnionFS(联合文件系统)
+
+  + Union文件系统（UnionFS）是一种分层、轻量级并且高性能的文件系统，它支持对文件系统的修改作为一次提交来一层层的叠加，同时可以将不同目录挂载到同一个虚拟文件系统下（Unite several directories into a single virtual filesystem）。Union文件系统是Docker镜像的基础。镜像可以通过分层来进行继承，基于基础镜像（没有父镜像），可以制作各种具体的应用镜像。
+  + 特性：一次同时加载多个文件系统，但从外面看起来，智能看到一个文件系统，联合加载会把各层文件系统叠加起来，这样最终的文件
+
+
+
+
+
+
+
+## 虚选镜像
+
+构建的时候或者删除镜像的时候出现错误
+
+没有名称、标签的镜像，没有任何价值
+
+使用以下命令进行删除
+
+```
+docker image prune
+```
+
+
+
+
+
+
+
+## Dockerfile发布微服务部署到docker容器
+
++ IDEA工具里面搞定微服务jar包
+
++ 编写Dockerfile
+
+  + Dockerfile内容
+
+    + ```
+      # 基础镜像使用Java
+      FROM java:8
+      # 作者
+      MAINTAINER MIE_JIANG
+      # VOLUME 指定临时文件目录为/tmp。在主机/var/lib/docker目录下创建了一个临时文件并连接到容器的/tmp
+      VOLUME /tmp
+      # 将jar包添加到容器中并更名为miejiang_docker.jar
+      ADD dockerDemo-0.0.1-SNAPSHOT.jar miejiang_docker.jar
+      # 运行jar包
+      RUN bash -c 'touch /miejiang_docker.jar'
+      ENTRYPOINT ["java","-jar","/miejiang_docker.jar"]
+      # 暴露6001端口作为服务
+      EXPOSE 6001
+      ```
+
+  + 将微服务jar包和Dockerfile文件上传到同一个目录下 /mydocker
+
++ 构建镜像
+
+  + docker build -t miejiang_docker:0.0.2 .
+  + 打包成镜像文件
+
++ 运行容器
+
++ 访问测试
