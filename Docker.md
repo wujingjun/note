@@ -1369,6 +1369,7 @@ docker image prune
     + container：新创建的容器不会创建自己的网卡和配置自己的IP，而是和一个指定的容器共享IP，端口范围等
       + 使用--network container:NAME或者容器ID指定
   + 容器实例内默认网络IP生产规则
+    
     + docker容器内部的IP是有可能会发生改变的
   + 案例说明
     + bridge
@@ -1391,9 +1392,94 @@ docker image prune
           + docker run -d -p 8081:8080 --name tomcat81 billygoo/tomcat8-jdk8
           + docekr run -d -p 8082:8080 --name tomcat82 billygoo/tomcat8-jdk8
           + docker容器都是会有eth0，宿主机内查看会多了两个veth,数字就看前方和结尾
+      
     + host
-      + 容器将不会获得一个独立的Network Namespace，而是和宿主机共用一个Network Namespace。容器将不会虚拟出自己的网卡而是使用宿主机的IP和端口。
-      + ![image-20221213235309609](D:\note\Docker.assets\image-20221213235309609.png)
+      + 说明
+        + 容器将不会获得一个独立的Network Namespace，而是和宿主机共用一个Network Namespace。容器将不会虚拟出自己的网卡而是使用宿主机的IP和端口。
+        + ![image-20221213235309609](D:\note\Docker.assets\image-20221213235309609.png)
+        + 代码
+          + 警告
+            + docker run -d -p 8083:8080 --network host --name tomcat83 billygoo/tomcat-jdk8
+            + ![image-20221214204600649](D:\note\Docker.assets\image-20221214204600649.png)
+            + 问题
+              + docker启动时总是遇见标题中的警告
+            + 原因
+              + docker启动时指定network=host或-net=host，如果还指定了-p映射端口，那这个时候就会有此警告，并且通过-p设置的参数将不会起到任何作用，端口号会以主机端口号为主，重复时则递增。
+            + 解决
+              + 解决的办法就是使用docker的其它网络模式，例如--network=bridge，这样就可以解决问题，或直接无视
+          + 正确
+            + docker run -d  --network host --name tomcat83 billygoo/tomcat-jdk8
+        + 无之前的配对显示了，看容器实例内部
+        + 没有设置-p的端口映射了，如何访问启动的tomcat83?
+          + 就是宿主机的ip+默认端口
+      
+    + none
 
-+ Docker平台架构图解
+      + 是什么
+        + 禁用网络功能，只有lo标识（就是127.0.0.1表示本地回环）
+        + 在none模式下，并不为Docker容器进行任何网络配置
+        + 也就是说，这个Docker容器没有网卡、IP、路由等信息，只有一个lo
+        + 需要我们自己为Docker容器添加网卡、配置IP等
+      + 案例
+        + docker run -d -p 8084:8080 --network none -name tomcat84 billygoo/tomcat-jdk8
 
+    + container
+
+      + 是什么
+        + 新建的容器和已经存在的一个容器共享一个网络ip配置而不是和宿主机共享。新创建的容器不会创建自己的网卡，配置自己的IP，而是和一个指定的容器共享IP、端口范围等。同样，两个容器除了网络方面，其它的如文件系统、进程列表还是隔离的。
+        + ![image-20221214210529364](D:\note\Docker.assets\image-20221214210529364.png)
+      + 案例1
+        + docker run -d -p 8085:8080 --name tomcat85 billygoo/tomcat8-jdk8
+        + docker run -d -p 8086:8080 --network container:tomcat85 --name tomcat86 billygoo/tomcat8-jdk8
+        + 运行结果
+          + ![image-20221214210931845](D:\note\Docker.assets\image-20221214210931845.png)
+          + 相当于tomcat85和tomcat86公用同一个ip同一个端口，导致端口冲突
+      + 案例2
+        + Alpine操作系统是一个面向安全的轻型linux发行版
+          + Apline Linux是一款独立的、非商业的通用linux发行版，专为追求安全性、简单性和资源效率的用户而设计。可能很多人没听说过这个Linux发行版本，但是经常用Docker的朋友可能都用过，因为他小，简单，安全著称，所以作为基础镜像是非常好的一个选择，可谓是麻雀虽小但五脏俱全，镜像非常小巧，不到6M的大小，所以特别适合容器打包。
+        + docker run -it --name alpine1 alpine /bin/sh
+        + docker run -it  --network container:alpine2 --name alpine2 alpine /bin/sh
+        + 运行结果，验证共用搭桥
+        + 假如此时关闭alpine1,再看看alpine2
+
+    + 自定义网络
+
+      + 自定义桥接网络，自定义网络默认使用的是桥接网络bridge
+
+      + 新建自定义网络
+        + docker network ls
+        + docker network create zzyy_network
+      + 新建容器加入上一步新建的自定义网络
+        + docker run -d -p 8081:8080 --network zzyy_network --name tomcat81 billygoo/tomcat8-jdk8
+        + docker run -d -p 8082:8080 --network zzyy_network --name tomcat82 billygoo/tomcat8-jdk
+
+
+
+
+
+
+# Docker-Compose
+
+
+
+## 是什么
+
+Docker-Compose是Docker官方的开源项目，负责实现对Docker容器集群的快速编排。
+
+Compose是Docker公司推出的一个工具软件，可以管理多个Docker容器组成一个应用，你需要定义一个YAML格式的配置文件docker-compose.yml，写好多个容器之间的调用关系。然后，只要一个命令，就能同时启动/关闭这些容器。
+
+
+
+
+
+
+
+## 能干嘛
+
+Docker建议我们每一个容器中只运行一个服务，因为Docker容器本身占用资源极少，所以最好是将每个服务单独的分割开来但是我们又面临了一个问题？
+
+如果我们需要同时部署好多个服务，难道要每个服务单独写Dockerfile然后再构建镜像，构建容器，这样累都累死了，所以Docker官方给我们提供了docker-compose多服务部署的工具
+
+Compose允许用户通过一个单独的docker-compose.yml模板文件（YAML格式）来定义一组相关联的应用容器为一个项目（project）。
+
+可以很容易地用一个配置文件定义一个多容器的应用，然后使用一条指令安装这个应用的所有依赖，完成构建。Docker-Compose解决了容器与容器之间如何管理编排的问题。
